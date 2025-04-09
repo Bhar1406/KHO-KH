@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kho Kho Championship Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+  <style>
+    :root {
+      --primary-purple: #6a0dad;
+      --primary-gold: #ffd700;
+      --team-a-color: #FF6B00;
+      --team-b-color: #005AFF;
+    }
+    
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background-color: #f8f9fa;
+    }
+    
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    
+    .timer-display {
+      background: linear-gradient(135deg, var(--primary-purple) 0%, #8a2be2 80%);
+      box-shadow: 
+        0 10px 20px rgba(0,0,0,0.2),
+        inset 0 4px 8px rgba(255,255,255,0.3),
+        inset 0 -4px 8px rgba(0,0,0,0.2);
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .control-btn {
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .control-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+    }
+    
+    .control-btn:active {
+      transform: translateY(0);
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    .timer-warning {
+      animation: blink 1s infinite, pulse 1.5s infinite;
+      color: #ff3333 !important;
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.6s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .score-change {
+      animation: scorePop 0.4s ease-out;
+    }
+    
+    @keyframes scorePop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <!-- Admin Panel -->
+  <div id="adminPanel" class="container mx-auto px-4 py-8 max-w-6xl">
+    <header class="text-center mb-10 fade-in">
+      <h1 class="text-5xl font-extrabold text-gray-800 mb-3">
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-yellow-500">KHO KHO</span>
+        <span class="text-gray-800">CHAMPIONSHIP MEN 2024 - 25</span>
+      </h1>
+      <div class="text-xl font-semibold text-gray-600 bg-white/80 inline-block px-6 py-2 rounded-full">
+        OFFICIAL SCORE CONTROL PANEL
+      </div>
+    </header>
+
+    <!-- Team Configuration -->
+    <div class="grid md:grid-cols-3 gap-6 mb-8 fade-in">
+      <!-- Team A -->
+      <div class="glass-card rounded-2xl p-6">
+        <h3 class="text-2xl font-bold mb-4 text-center" style="color: var(--team-a-color)">TEAM A</h3>
+        <div class="space-y-5">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Team Name</label>
+            <input id="teamAName" class="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg" value="INDIA">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Team Color</label>
+            <input type="color" id="teamAColor" value="#FF6B00" class="w-full h-12 cursor-pointer rounded-lg border-2 border-gray-200">
+          </div>
+          <div class="pt-4">
+            <div class="text-6xl font-black text-center py-4" id="scoreA" style="color: var(--team-a-color)">00</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Match Center -->
+      <div class="glass-card rounded-2xl p-6 flex flex-col">
+        <h3 class="text-2xl font-bold mb-5 text-center text-gray-800">MATCH CONTROL</h3>
+        <div class="flex-grow space-y-5">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Match Phase</label>
+            <select id="matchPhase" class="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg">
+              <option>1st Innings</option>
+              <option>2nd Innings</option>
+              <option>Extra Time</option>
+              <option>Final</option>
+            </select>
+          </div>
+          <div class="text-center py-3 bg-gray-100/80 rounded-xl border-2 border-gray-200">
+            <div id="turnDisplay" class="font-bold text-lg">Turn 1 - INDIA Attacking</div>
+          </div>
+          <div class="text-center">
+            <div class="text-3xl font-bold mb-3">TIMER</div>
+            <div id="timer" class="text-6xl font-black py-4 px-8 rounded-xl inline-block timer-display text-white">10:00</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Team B -->
+      <div class="glass-card rounded-2xl p-6">
+        <h3 class="text-2xl font-bold mb-4 text-center" style="color: var(--team-b-color)">TEAM B</h3>
+        <div class="space-y-5">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Team Name</label>
+            <input id="teamBName" class="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg" value="PAKISTAN">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Team Color</label>
+            <input type="color" id="teamBColor" value="#005AFF" class="w-full h-12 cursor-pointer rounded-lg border-2 border-gray-200">
+          </div>
+          <div class="pt-4">
+            <div class="text-6xl font-black text-center py-4" id="scoreB" style="color: var(--team-b-color)">00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timer Controls -->
+    <div class="glass-card rounded-2xl p-6 mb-8 fade-in">
+      <div class="grid md:grid-cols-3 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Set Timer (minutes)</label>
+          <div class="flex">
+            <input id="customTimer" type="number" min="1" class="flex-grow px-5 py-3 border-2 border-gray-200 rounded-l-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg" placeholder="10">
+            <button id="setTimerBtn" class="px-6 py-3 bg-purple-600 text-white rounded-r-xl control-btn font-bold">SET</button>
+          </div>
+        </div>
+        <div class="flex justify-center space-x-4">
+          <button id="playPauseBtn" class="px-8 py-4 bg-green-600 text-white rounded-xl control-btn flex items-center font-bold">
+            <span id="playIcon" class="text-xl mr-2">▶</span>
+            <span id="playText">START</span>
+          </button>
+          <button id="resetTimerBtn" class="px-8 py-4 bg-yellow-500 text-white rounded-xl control-btn font-bold">RESET</button>
+        </div>
+        <div class="flex justify-center">
+          <button id="nextTurnBtn" class="px-8 py-4 bg-blue-600 text-white rounded-xl control-btn font-bold">NEXT TURN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Score Controls -->
+    <div class="grid md:grid-cols-2 gap-6 mb-8 fade-in">
+      <div class="glass-card rounded-2xl p-6">
+        <h3 class="text-xl font-bold mb-4 text-center uppercase tracking-wider" style="color: var(--team-a-color)">TEAM A CONTROLS</h3>
+        <div class="flex justify-center space-x-4">
+          <button id="teamAMinus5" class="px-6 py-3 bg-red-500 text-white rounded-xl control-btn font-bold">-5</button>
+          <button id="teamAMinus1" class="px-6 py-3 bg-orange-400 text-white rounded-xl control-btn font-bold">-1</button>
+          <button id="teamAPlus1" class="px-6 py-3 bg-green-500 text-white rounded-xl control-btn font-bold">+1</button>
+          <button id="teamAPlus5" class="px-6 py-3 bg-green-600 text-white rounded-xl control-btn font-bold">+5</button>
+        </div>
+      </div>
+      <div class="glass-card rounded-2xl p-6">
+        <h3 class="text-xl font-bold mb-4 text-center uppercase tracking-wider" style="color: var(--team-b-color)">TEAM B CONTROLS</h3>
+        <div class="flex justify-center space-x-4">
+          <button id="teamBMinus5" class="px-6 py-3 bg-red-500 text-white rounded-xl control-btn font-bold">-5</button>
+          <button id="teamBMinus1" class="px-6 py-3 bg-blue-400 text-white rounded-xl control-btn font-bold">-1</button>
+          <button id="teamBPlus1" class="px-6 py-3 bg-green-500 text-white rounded-xl control-btn font-bold">+1</button>
+          <button id="teamBPlus5" class="px-6 py-3 bg-green-600 text-white rounded-xl control-btn font-bold">+5</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Match Management -->
+    <div class="flex justify-center space-x-6 fade-in mb-10">
+      <button id="newMatchBtn" class="px-10 py-4 bg-gray-600 text-white rounded-xl control-btn font-bold text-lg">NEW MATCH</button>
+      <button id="broadcastViewBtn" class="px-10 py-4 bg-purple-600 text-white rounded-xl control-btn font-bold text-lg">OPEN BROADCAST</button>
+    </div>
+  </div>
+
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsDt0Wu-9J2Ip68Nn7SuMApxShtZnx1n0",
+      authDomain: "kho-kho-ed89c.firebaseapp.com",
+      databaseURL: "https://kho-kho-ed89c-default-rtdb.firebaseio.com",
+      projectId: "kho-kho-ed89c",
+      storageBucket: "kho-kho-ed89c.appspot.com",
+      messagingSenderId: "196379870032",
+      appId: "1:196379870032:web:935d9c1144bbc51ba9e255"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Game State
+    let scoreA = 0, scoreB = 0;
+    let timer = 600;
+    let interval = null;
+    let turn = 1;
+    let teamAColor = '#FF6B00';
+    let teamBColor = '#005AFF';
+    let isAttackingA = true;
+    let broadcastWindow = null;
+
+    // DOM Elements
+    const timerEl = document.getElementById('timer');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const playText = document.getElementById('playText');
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadMatch();
+      updateDisplay();
+      setupEventListeners();
+      updateTeamColors();
+      
+      // Listen for real-time updates from Firebase
+      database.ref('matchState').on('value', (snapshot) => {
+        const state = snapshot.val();
+        if (state && !isLocalChange()) {
+          updateFromState(state);
+        }
+      });
+    });
+
+    // Track if changes are local to prevent feedback loops
+    let localChange = false;
+    function isLocalChange() {
+      return localChange;
+    }
+
+    function setupEventListeners() {
+      // Set up color pickers
+      document.getElementById('teamAColor').addEventListener('input', (e) => {
+        teamAColor = e.target.value;
+        updateTeamColors();
+        updateDisplay();
+      });
+      
+      document.getElementById('teamBColor').addEventListener('input', (e) => {
+        teamBColor = e.target.value;
+        updateTeamColors();
+        updateDisplay();
+      });
+      
+      // Team name inputs
+      document.getElementById('teamAName').addEventListener('input', updateDisplay);
+      document.getElementById('teamBName').addEventListener('input', updateDisplay);
+      
+      // Match phase
+      document.getElementById('matchPhase').addEventListener('change', updateDisplay);
+
+      // Timer controls
+      document.getElementById('setTimerBtn').addEventListener('click', setCustomTimer);
+      playPauseBtn.addEventListener('click', toggleTimer);
+      document.getElementById('resetTimerBtn').addEventListener('click', resetTimer);
+      document.getElementById('nextTurnBtn').addEventListener('click', nextTurn);
+
+      // Score controls
+      document.getElementById('teamAMinus5').addEventListener('click', () => changeScore('A', -5));
+      document.getElementById('teamAMinus1').addEventListener('click', () => changeScore('A', -1));
+      document.getElementById('teamAPlus1').addEventListener('click', () => changeScore('A', 1));
+      document.getElementById('teamAPlus5').addEventListener('click', () => changeScore('A', 5));
+      
+      document.getElementById('teamBMinus5').addEventListener('click', () => changeScore('B', -5));
+      document.getElementById('teamBMinus1').addEventListener('click', () => changeScore('B', -1));
+      document.getElementById('teamBPlus1').addEventListener('click', () => changeScore('B', 1));
+      document.getElementById('teamBPlus5').addEventListener('click', () => changeScore('B', 5));
+
+      // Match management
+      document.getElementById('newMatchBtn').addEventListener('click', newMatch);
+      document.getElementById('broadcastViewBtn').addEventListener('click', openBroadcastView);
+    }
+
+    // Update team colors
+    function updateTeamColors() {
+      document.documentElement.style.setProperty('--team-a-color', teamAColor);
+      document.documentElement.style.setProperty('--team-b-color', teamBColor);
+    }
+
+    function darkenColor(color, percent) {
+      const num = parseInt(color.replace('#', ''), 16);
+      const amt = Math.round(2.55 * percent);
+      const R = (num >> 16) - amt;
+      const G = (num >> 8 & 0x00FF) - amt;
+      const B = (num & 0x0000FF) - amt;
+      return '#' + (
+        0x1000000 +
+        (R < 0 ? 0 : R) * 0x10000 +
+        (G < 0 ? 0 : G) * 0x100 +
+        (B < 0 ? 0 : B)
+      ).toString(16).slice(1);
+    }
+
+    // Format time as MM:SS
+    function formatTime(seconds) {
+      const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const secs = String(seconds % 60).padStart(2, '0');
+      return `${mins}:${secs}`;
+    }
+
+    // Update all displays
+    function updateDisplay() {
+      // Update scores
+      document.getElementById('scoreA').textContent = String(scoreA).padStart(2, '0');
+      document.getElementById('scoreB').textContent = String(scoreB).padStart(2, '0');
+      
+      // Update timer
+      const timeStr = formatTime(timer);
+      timerEl.textContent = timeStr;
+      
+      // Timer warning effects
+      if (timer <= 60) {
+        timerEl.classList.add('timer-warning');
+      } else {
+        timerEl.classList.remove('timer-warning');
+      }
+      
+      // Update team names
+      const teamA = document.getElementById('teamAName').value || 'Team A';
+      const teamB = document.getElementById('teamBName').value || 'Team B';
+      
+      // Update turn/attack info
+      isAttackingA = turn % 2 === 1;
+      const attackingTeam = isAttackingA ? teamA : teamB;
+      
+      document.getElementById('turnDisplay').textContent = `Turn ${turn} - ${attackingTeam} Attacking`;
+      
+      // Update match phase
+      const phase = document.getElementById('matchPhase').value;
+      
+      // End of timer beep
+      if (timer === 0) playBeep();
+      
+      // Save state
+      saveMatch();
+      
+      // Update broadcast window if open
+      updateBroadcastWindow();
+    }
+
+    // Score adjustment
+    function changeScore(team, delta) {
+      localChange = true;
+      if (team === 'A') {
+        scoreA = Math.max(0, scoreA + delta);
+      } else {
+        scoreB = Math.max(0, scoreB + delta);
+      }
+      updateDisplay();
+      setTimeout(() => { localChange = false; }, 100);
+    }
+
+    // Timer controls
+    function toggleTimer() {
+      localChange = true;
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+        playIcon.textContent = '▶';
+        playText.textContent = 'START';
+      } else {
+        interval = setInterval(() => {
+          if (timer > 0) {
+            timer--;
+            updateDisplay();
+          } else {
+            clearInterval(interval);
+            interval = null;
+            playIcon.textContent = '▶';
+            playText.textContent = 'START';
+          }
+        }, 1000);
+        playIcon.textContent = '⏸';
+        playText.textContent = 'PAUSE';
+      }
+      setTimeout(() => { localChange = false; }, 100);
+    }
+
+    function resetTimer() {
+      localChange = true;
+      const mins = parseInt(document.getElementById('customTimer').value) || 10;
+      timer = mins * 60;
+      updateDisplay();
+      setTimeout(() => { localChange = false; }, 100);
+    }
+
+    function setCustomTimer() {
+      localChange = true;
+      const mins = parseInt(document.getElementById('customTimer').value);
+      if (!isNaN(mins)) {
+        timer = mins * 60;
+        updateDisplay();
+      }
+      setTimeout(() => { localChange = false; }, 100);
+    }
+
+    // Match progression
+    function nextTurn() {
+      localChange = true;
+      turn++;
+      resetTimer();
+      updateDisplay();
+      setTimeout(() => { localChange = false; }, 100);
+    }
+
+    function newMatch() {
+      if (confirm('Start a new match? Current progress will be lost.')) {
+        localChange = true;
+        scoreA = 0;
+        scoreB = 0;
+        timer = 600;
+        turn = 1;
+        teamAColor = '#FF6B00';
+        teamBColor = '#005AFF';
+        document.getElementById('teamAName').value = 'INDIA';
+        document.getElementById('teamBName').value = 'PAKISTAN';
+        document.getElementById('matchPhase').value = '1st Innings';
+        document.getElementById('customTimer').value = '';
+        document.getElementById('teamAColor').value = teamAColor;
+        document.getElementById('teamBColor').value = teamBColor;
+        updateTeamColors();
+        updateDisplay();
+        setTimeout(() => { localChange = false; }, 100);
+      }
+    }
+
+    // Audio feedback
+    function playBeep() {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+      oscillator.connect(audioCtx.destination);
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.3);
+    }
+
+    // Broadcast view control
+    function openBroadcastView() {
+      // Generate a unique URL for the broadcast
+      const broadcastURL = window.location.href.replace(/\.html$/, '') + '-broadcast.html';
+      
+      // Open in new tab
+      broadcastWindow = window.open(broadcastURL, 'KhoKhoBroadcast', 'width=800,height=200');
+      
+      // Send initial state immediately when opened
+      const sendInitialState = () => {
+        if (broadcastWindow && !broadcastWindow.closed) {
+          const teamA = document.getElementById('teamAName').value || 'INDIA';
+          const teamB = document.getElementById('teamBName').value || 'PAKISTAN';
+          const phase = document.getElementById('matchPhase').value || '1st Innings';
+          
+          broadcastWindow.postMessage({
+            teamA: teamA,
+            teamB: teamB,
+            teamAColor: teamAColor,
+            teamBColor: teamBColor,
+            scoreA: scoreA,
+            scoreB: scoreB,
+            timer: timer,
+            isAttackingA: isAttackingA,
+            turn: turn,
+            phase: phase
+          }, '*');
+        }
+      };
+      
+      // Create a listener for when the broadcast window loads
+      const checkWindow = setInterval(() => {
+        if (broadcastWindow && broadcastWindow.document.readyState === 'complete') {
+          clearInterval(checkWindow);
+          sendInitialState();
+        }
+      }, 100);
+    }
+
+    function updateBroadcastWindow() {
+      if (broadcastWindow && !broadcastWindow.closed) {
+        const teamA = document.getElementById('teamAName').value || 'INDIA';
+        const teamB = document.getElementById('teamBName').value || 'PAKISTAN';
+        const phase = document.getElementById('matchPhase').value || '1st Innings';
+        
+        broadcastWindow.postMessage({
+          teamA: teamA,
+          teamB: teamB,
+          teamAColor: teamAColor,
+          teamBColor: teamBColor,
+          scoreA: scoreA,
+          scoreB: scoreB,
+          timer: timer,
+          isAttackingA: isAttackingA,
+          turn: turn,
+          phase: phase
+        }, '*');
+      }
+    }
+
+    // Listen for requests from broadcast window
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'requestInitialState') {
+        updateBroadcastWindow();
+      }
+    });
+
+    // Save/Load match state
+    function saveMatch() {
+      const matchState = {
+        scoreA: scoreA,
+        scoreB: scoreB,
+        timer: timer,
+        turn: turn,
+        teamAColor: teamAColor,
+        teamBColor: teamBColor,
+        teamAName: document.getElementById('teamAName').value,
+        teamBName: document.getElementById('teamBName').value,
+        matchPhase: document.getElementById('matchPhase').value,
+        isPlaying: interval !== null
+      };
+      
+      // Save to localStorage
+      localStorage.setItem('khoKhoMatchState', JSON.stringify(matchState));
+      
+      // Save to Firebase
+      if (localChange) {
+        database.ref('matchState').set(matchState)
+          .catch(error => {
+            console.error("Firebase save error:", error);
+          });
+      }
+    }
+
+    function loadMatch() {
+      // First try to load from Firebase
+      database.ref('matchState').once('value').then((snapshot) => {
+        const state = snapshot.val();
+        if (state) {
+          updateFromState(state);
+        } else {
+          // If no Firebase data, try localStorage
+          const savedState = localStorage.getItem('khoKhoMatchState');
+          if (savedState) {
+            updateFromState(JSON.parse(savedState));
+          }
+        }
+      }).catch(error => {
+        console.error("Firebase load error:", error);
+        // Fallback to localStorage if Firebase fails
+        const savedState = localStorage.getItem('khoKhoMatchState');
+        if (savedState) {
+          updateFromState(JSON.parse(savedState));
+        }
+      });
+    }
+
+    function updateFromState(state) {
+      scoreA = state.scoreA || 0;
+      scoreB = state.scoreB || 0;
+      timer = state.timer || 600;
+      turn = state.turn || 1;
+      teamAColor = state.teamAColor || '#FF6B00';
+      teamBColor = state.teamBColor || '#005AFF';
+      document.getElementById('teamAName').value = state.teamAName || 'INDIA';
+      document.getElementById('teamBName').value = state.teamBName || 'PAKISTAN';
+      document.getElementById('matchPhase').value = state.matchPhase || '1st Innings';
+      document.getElementById('teamAColor').value = teamAColor;
+      document.getElementById('teamBColor').value = teamBColor;
+      
+      if (state.isPlaying) {
+        toggleTimer(); // Start timer if it was playing
+      }
+      
+      updateDisplay();
+    }
+  </script>
+</body>
+</html>
